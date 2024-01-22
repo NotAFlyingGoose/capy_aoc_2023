@@ -1,0 +1,494 @@
+
+core :: mod "core";
+libc :: core.libc;
+ptr :: core.ptr;
+math :: core.math;
+
+Allocator :: struct {
+    alloc: (bytes: usize) -> ^mut any,
+    free: (ptr: ^any) -> void,
+};
+
+File :: struct {
+    allocator: ^Allocator,
+    text: str,
+    len: usize,
+};
+
+read_file :: (allocator: ^Allocator, filename: str) -> File {
+    my_file := libc.fopen(filename, "r");
+
+    if my_file == 0 {
+        core.print(filename);
+        core.println(" does not exist");
+        libc.exit(1);
+    }
+
+    cap := 0;
+    len := 0;
+
+    buf := ptr.mut_null() as ^mut char;
+    
+    loop {
+        ch := libc.fgetc(my_file);
+
+        if feof(my_file) || ch == 0 {
+            break;
+        } else {
+            if len >= cap {
+                new_cap := math.max_usize(cap * 2, 1);
+
+                new_buf := allocator.alloc(new_cap) as ^mut char;
+
+                if !ptr.is_null(buf) {
+                    libc.memcpy(new_buf, buf, cap);
+                    allocator.free(buf);
+                }
+
+                buf = new_buf;
+                cap = new_cap;
+            }
+
+            ptr.write(buf, ch as u8, len);
+
+            len = len + 1;
+        }
+    }
+
+    libc.fclose(my_file);
+
+    File {
+        allocator: allocator,
+        text: buf as str,
+        len: len,
+    }
+}
+
+print_file :: (file: ^File) {
+    idx := 0;
+    while idx < file.len {
+        libc.putchar({ptr.const_offset(file.text as ^char, idx) as ^char}^);
+        idx = idx + 1;
+    }
+}
+
+close_file :: (file: ^File) {
+    file.allocator.free(file.text as ^char)
+}
+
+feof :: (fp: usize) -> bool extern;
+
+main :: () {
+    libc_alloc := Allocator {
+        alloc: libc.malloc,
+        free: libc.free,
+    };
+
+    solve(^libc_alloc, "day_1/puzzle_input.txt", true);
+}
+
+test :: () {
+    libc_alloc := Allocator {
+        alloc: libc.malloc,
+        free: libc.free,
+    };
+
+    core.assert(solve(^libc_alloc, "day_1/example_p1.txt", false) == 142);
+    core.assert(solve(^libc_alloc, "day_1/example_p2.txt", true) == 281);
+    core.assert(solve(^libc_alloc, "day_1/test.txt", true) == 40);
+}
+
+// bitset for the current digits
+WordState :: struct {
+    one: u8,
+    two: u8,
+    three: u8,
+    four: u8,
+    five: u8,
+    six: u8,
+    seven: u8,
+    eight: u8,
+    nine: u8,
+};
+
+solve :: (allocator: ^Allocator, filename: str, part_two: bool) -> i32 {
+    my_file := read_file(allocator, filename);
+
+    total_sum := 0; 
+
+    first_digit := -1;
+    last_digit := 1;
+
+    word_state := WordState {
+        one: 0,
+        two: 0,
+        three: 0,
+        four: 0,
+        five: 0,
+        six: 0,
+        seven: 0,
+        eight: 0,
+        nine: 0,
+    };
+
+    idx := 0;
+    line := 0;
+    while idx < my_file.len {
+        ch :: {ptr.const_offset(my_file.text as ^any, idx) as ^char}^;
+
+        if ch == '\n' {
+            line = line + 1;
+
+            word_state = WordState {
+                one: 0,
+                two: 0,
+                three: 0,
+                four: 0,
+                five: 0,
+                six: 0,
+                seven: 0,
+                eight: 0,
+                nine: 0,
+            };
+
+            num : i32 = 10 * first_digit + last_digit;
+
+            printf("%i : ", line);
+            printf("%i\n", num);
+
+            total_sum = total_sum + num;
+
+            first_digit = -1;
+            last_digit = 1;
+        } else {
+            digit := char_to_digit(ch);
+
+            if digit != -1 {
+                if first_digit == -1 {
+                    first_digit = digit;
+                }
+
+                last_digit = digit;
+            } else if part_two {
+                loop {
+                if word_state.one == 0 {
+                    if ch == 'o' {
+                        word_state.one = word_state.one + 1;
+                    }
+                    break;
+                } else if word_state.one == 1 {
+                    if ch == 'n' {
+                        word_state.one = word_state.one + 1;
+                        break;
+                    } else {
+                        word_state.one = 0;
+                    }
+                } else if word_state.one == 2 {
+                    if ch == 'e' {
+                        if first_digit == -1 {
+                            first_digit = 1;
+                        }
+
+                        last_digit = 1;
+                        break;
+                    }
+                    word_state.one = 0;
+                }
+                }
+
+                loop {
+                if word_state.two == 0 {
+                    if ch == 't' {
+                        word_state.two = word_state.two + 1;
+                    }
+                    break;
+                } else if word_state.two == 1 {
+                    if ch == 'w' {
+                        word_state.two = word_state.two + 1;
+                        break;
+                    } else {
+                        word_state.two = 0;
+                    }
+                } else if word_state.two == 2 {
+                    if ch == 'o' {
+                        if first_digit == -1 {
+                            first_digit = 2;
+                        }
+
+                        last_digit = 2;
+                        break;
+                    }
+                    word_state.two = 0;
+                }
+                }
+
+                loop {
+                if word_state.three == 0 {
+                    if ch == 't' {
+                        word_state.three = word_state.three + 1;
+                    }
+                    break;
+                } else if word_state.three == 1 {
+                    if ch == 'h' {
+                        word_state.three = word_state.three + 1;
+                        break;
+                    } else {
+                        word_state.three = 0;
+                    }
+                } else if word_state.three == 2 {
+                    if ch == 'r' {
+                        word_state.three = word_state.three + 1;
+                        break;
+                    } else {
+                        word_state.three = 0;
+                    }
+                } else if word_state.three == 3 {
+                    if ch == 'e' {
+                        word_state.three = word_state.three + 1;
+                        break;
+                    } else {
+                        word_state.three = 0;
+                    }
+                } else if word_state.three == 4 {
+                    if ch == 'e' {
+                        if first_digit == -1 {
+                            first_digit = 3;
+                        }
+
+                        last_digit = 3;
+                        break;
+                    }
+                    word_state.three = 0;
+                }
+                }
+
+                loop {
+                if word_state.four == 0 {
+                    if ch == 'f' {
+                        word_state.four = word_state.four + 1;
+                    }
+                    break;
+                } else if word_state.four == 1 {
+                    if ch == 'o' {
+                        word_state.four = word_state.four + 1;
+                        break;
+                    } else {
+                        word_state.four = 0;
+                    }
+                } else if word_state.four == 2 {
+                    if ch == 'u' {
+                        word_state.four = word_state.four + 1;
+                        break;
+                    } else {
+                        word_state.four = 0;
+                    }
+                } else if word_state.four == 3 {
+                    if ch == 'r' {
+                        if first_digit == -1 {
+                            first_digit = 4;
+                        }
+
+                        last_digit = 4;
+                        break;
+                    }
+                    word_state.four = 0;
+                }
+                }
+
+                loop {
+                if word_state.five == 0 {
+                    if ch == 'f' {
+                        word_state.five = word_state.five + 1;
+                    }
+                    break;
+                } else if word_state.five == 1 {
+                    if ch == 'i' {
+                        word_state.five = word_state.five + 1;
+                        break;
+                    } else {
+                        word_state.five = 0;
+                    }
+                } else if word_state.five == 2 {
+                    if ch == 'v' {
+                        word_state.five = word_state.five + 1;
+                        break;
+                    } else {
+                        word_state.five = 0;
+                    }
+                } else if word_state.five == 3 {
+                    if ch == 'e' {
+                        if first_digit == -1 {
+                            first_digit = 5;
+                        }
+
+                        last_digit = 5;
+                        break;
+                    }
+                    word_state.five = 0;
+                }
+                }
+
+                loop {
+                if word_state.six == 0 {
+                    if ch == 's' {
+                        word_state.six = word_state.six + 1;
+                    }
+                    break;
+                } else if word_state.six == 1 {
+                    if ch == 'i' {
+                        word_state.six = word_state.six + 1;
+                        break;
+                    } else {
+                        word_state.six = 0;
+                    }
+                } else if word_state.six == 2 {
+                    if ch == 'x' {
+                        if first_digit == -1 {
+                            first_digit = 6;
+                        }
+
+                        last_digit = 6;
+                        break;
+                    }
+                    word_state.six = 0;
+                }
+                }
+
+                loop {
+                if word_state.seven == 0 {
+                    if ch == 's' {
+                        word_state.seven = word_state.seven + 1;
+                    }
+                    break;
+                } else if word_state.seven == 1 {
+                    if ch == 'e' {
+                        word_state.seven = word_state.seven + 1;
+                        break;
+                    } else {
+                        word_state.seven = 0;
+                    }
+                } else if word_state.seven == 2 {
+                    if ch == 'v' {
+                        word_state.seven = word_state.seven + 1;
+                        break;
+                    } else {
+                        word_state.seven = 0;
+                    }
+                } else if word_state.seven == 3 {
+                    if ch == 'e' {
+                        word_state.seven = word_state.seven + 1;
+                        break;
+                    } else {
+                        word_state.seven = 0;
+                    }
+                } else if word_state.seven == 4 {
+                    if ch == 'n' {
+                        if first_digit == -1 {
+                            first_digit = 7;
+                        }
+
+                        last_digit = 7;
+                        break;
+                    }
+                    word_state.seven = 0;
+                }
+                }
+
+                loop {
+                if word_state.eight == 0 {
+                    if ch == 'e' {
+                        word_state.eight = word_state.eight + 1;
+                    }
+                    break;
+                } else if word_state.eight == 1 {
+                    if ch == 'i' {
+                        word_state.eight = word_state.eight + 1;
+                        break;
+                    } else {
+                        word_state.eight = 0;
+                    }
+                } else if word_state.eight == 2 {
+                    if ch == 'g' {
+                        word_state.eight = word_state.eight + 1;
+                        break;
+                    } else {
+                        word_state.eight = 0;
+                    }
+                } else if word_state.eight == 3 {
+                    if ch == 'h' {
+                        word_state.eight = word_state.eight + 1;
+                        break;
+                    } else {
+                        word_state.eight = 0;
+                    }
+                } else if word_state.eight == 4 {
+                    if ch == 't' {
+                        if first_digit == -1 {
+                            first_digit = 8;
+                        }
+
+                        last_digit = 8;
+                        break;
+                    }
+                    word_state.eight = 0;
+                }
+                }
+
+                loop {
+                if word_state.nine == 0 {
+                    if ch == 'n' {
+                        word_state.nine = word_state.nine + 1;
+                    }
+                    break;
+                } else if word_state.nine == 1 {
+                    if ch == 'i' {
+                        word_state.nine = word_state.nine + 1;
+                        break;
+                    } else {
+                        word_state.nine = 0;
+                    }
+                } else if word_state.nine == 2 {
+                    if ch == 'n' {
+                        word_state.nine = word_state.nine + 1;
+                        break;
+                    } else {
+                        word_state.nine = 0;
+                    }
+                } else if word_state.nine == 3 {
+                    if ch == 'e' {
+                        if first_digit == -1 {
+                            first_digit = 9;
+                        }
+
+                        last_digit = 9;
+                        break;
+                    }
+                    word_state.nine = 0;
+                }
+                }
+            }
+        }
+
+        idx = idx + 1;
+    }
+
+    core.println("=");
+    core.print_any(core.Any{ty:i32, data:^total_sum});
+    core.println("");
+
+    close_file(^my_file);
+
+    total_sum
+}
+
+// a value of -1 represents an error
+char_to_digit :: (ch: char) -> i32 {
+    ch := ch as u8;
+    if '0' as u8 <= ch && ch <= '9' as u8 {
+        ch - {'0' as u8} as i32
+    } else {
+        -1
+    }
+}
+
+printf :: (fmt: str, n: i32) extern;
